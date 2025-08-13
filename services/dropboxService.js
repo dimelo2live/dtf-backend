@@ -85,7 +85,7 @@ class DropboxService {
       const fileName = this.generateFileName(quoteData);
       const filePath = `/dtf-quotes/${fileName}`;
       
-      // Generate HTML content
+      // Generate HTML content with proper location data
       const htmlContent = this.generateQuoteHtml(quoteData);
       
       // Upload HTML file
@@ -99,12 +99,23 @@ class DropboxService {
         customer_email: quoteData.customer_email,
         date_created: quoteData.date_created,
         data: quoteData.data,
-        locations: quoteData.locations,
+        locations: quoteData.locations, // Ensure locations are preserved
         total_transfers: quoteData.total_transfers,
         pricing: quoteData.pricing,
         file_path: filePath,
         last_updated: new Date().toISOString()
       };
+
+      // Debug location data being saved
+      console.log('📤 Saving quote data:', {
+        id: quoteData.id,
+        quote_name: quoteData.quote_name,
+        customer_id: quoteData.customer_id,
+        hasData: !!quoteData.data,
+        dataKeys: quoteData.data ? Object.keys(quoteData.data) : []
+      });
+
+      console.log('💾 Saving metadata:', metadata);
 
       // Save metadata
       const metadataPath = `/dtf-quotes/${quoteData.id}_metadata.json`;
@@ -279,46 +290,545 @@ class DropboxService {
   }
 
   /**
-   * Generate HTML content from quote data
+   * Generate HTML content from quote data with proper location support
    */
   generateQuoteHtml(quoteData) {
-    // This is a simplified version - you'll need to implement based on your template
     const data = quoteData.data || {};
+    const locations = quoteData.locations || [];
     
+    // Generate location HTML if locations exist
+    let locationHtml = '';
+    if (locations && locations.length > 0) {
+      locationHtml = locations.map((location, index) => {
+        const number = index + 1;
+        const name = location.name || `Location ${number}`;
+        const width = location.width || location.w || 0;
+        const height = location.height || location.h || 0;
+        const quantity = location.quantity || location.qty || location.q || 0;
+        
+        return `
+          <div class="location-item">
+            <div class="location-header">
+              <span class="location-number">${number}</span>
+              <span>${name}</span>
+            </div>
+            <div class="location-specs">
+              <div class="location-spec">
+                <div class="location-spec-label">Width</div>
+                <div class="location-spec-value">${width}"</div>
+              </div>
+              <div class="location-spec">
+                <div class="location-spec-label">Height</div>
+                <div class="location-spec-value">${height}"</div>
+              </div>
+              <div class="location-spec">
+                <div class="location-spec-label">Quantity</div>
+                <div class="location-spec-value">${quantity}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      locationHtml = `
+        <div class="location-item">
+          <div class="location-header">
+            <span class="location-number">!</span>
+            <span>No Location Data</span>
+          </div>
+          <div style="font-size: 9px; color: #666; text-align: center; padding: 0.5rem 0;">
+            Location information could not be loaded.
+          </div>
+        </div>
+      `;
+    }
+    
+    // Generate the full HTML template with proper location data
     let html = `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Quote: ${quoteData.quote_name}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { border-bottom: 2px solid #333; padding-bottom: 20px; }
-        .quote-details { margin: 20px 0; }
-        .pricing { background: #f5f5f5; padding: 15px; border-radius: 5px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DTF Quote: ${quoteData.quote_name}</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 0.5in;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body { height: 100%; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #333;
+      background: #f5f7fb;
+      margin: 0;
+      padding: 24px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    
+    .quote-container {
+      width: min(calc(8.5in - 1in), calc(100% - 48px));
+      min-height: calc(11in - 1in);
+      margin: 24px auto;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      padding: 0.5in;
+      overflow-wrap: anywhere;
+    }
+    
+    .quote-header {
+      background: linear-gradient(135deg, #CF0F0F 0%, #8B0000 100%);
+      color: white;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(207, 15, 15, 0.2);
+    }
+    
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    
+    .company-branding {
+      flex: 1;
+    }
+    
+    .company-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 0.2rem 0;
+      letter-spacing: 0.5px;
+    }
+    
+    .company-tagline {
+      font-size: 11px;
+      opacity: 0.9;
+      margin: 0;
+      font-style: italic;
+    }
+    
+    .quote-title {
+      font-size: 18px;
+      font-weight: 600;
+      text-align: right;
+      margin: 0;
+    }
+    
+    .header-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      opacity: 0.9;
+    }
+    
+    .contact-info {
+      display: flex;
+      gap: 1rem;
+    }
+    
+    .quote-meta {
+      display: flex;
+      gap: 1rem;
+    }
+    
+    .quote-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .quote-section {
+      background: #f8f9fa;
+      border-radius: 6px;
+      padding: 0.75rem;
+      border-left: 3px solid #CF0F0F;
+      break-inside: avoid;
+    }
+    
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #CF0F0F;
+      margin: 0 0 0.5rem 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.3rem 0;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 11px;
+    }
+    
+    .data-row:last-child {
+      border-bottom: none;
+    }
+    
+    .data-label {
+      font-weight: 600;
+      color: #666;
+    }
+    
+    .data-value {
+      font-weight: 700;
+      color: #333;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .highlight-value {
+      color: #CF0F0F;
+      font-size: 12px;
+    }
+    
+    /* Location Display */
+    .locations-section {
+      grid-column: 1 / -1;
+      background: #f0f8ff;
+      border-left-color: #2196F3;
+    }
+    
+    .locations-section .section-title {
+      color: #2196F3;
+    }
+    
+    .locations-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.5rem;
+    }
+    
+    .location-item {
+      background: white;
+      padding: 0.5rem;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .location-header {
+      font-weight: 700;
+      color: #2196F3;
+      font-size: 11px;
+      margin-bottom: 0.3rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    
+    .location-number {
+      background: #2196F3;
+      color: white;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 600;
+    }
+    
+    .location-specs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.3rem;
+      font-size: 10px;
+    }
+    
+    .location-spec {
+      text-align: center;
+      background: #f8f9fa;
+      padding: 0.2rem;
+      border-radius: 2px;
+    }
+    
+    .location-spec-label {
+      color: #666;
+      font-weight: 600;
+      font-size: 8px;
+      text-transform: uppercase;
+    }
+    
+    .location-spec-value {
+      font-weight: 700;
+      color: #333;
+      font-size: 10px;
+    }
+    
+    .pricing-summary {
+      grid-column: 1 / -1;
+      background: white;
+      border: 2px solid #CF0F0F;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+    
+    .pricing-header {
+      background: #CF0F0F;
+      color: white;
+      padding: 0.5rem 1rem;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .pricing-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+    }
+    
+    .pricing-column {
+      padding: 0.75rem;
+      text-align: center;
+      border-right: 1px solid #e0e0e0;
+    }
+    
+    .pricing-column:last-child {
+      border-right: none;
+    }
+    
+    .pricing-label {
+      font-size: 10px;
+      color: #666;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+    
+    .pricing-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #333;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .pricing-value.profit {
+      color: #28a745;
+    }
+    
+    .quote-footer {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      border-radius: 6px;
+      border: 1px solid #dee2e6;
+      text-align: center;
+    }
+    
+    .footer-brand {
+      font-size: 12px;
+      font-weight: 700;
+      color: #CF0F0F;
+      margin-bottom: 0.3rem;
+    }
+    
+    .footer-contact {
+      font-size: 10px;
+      color: #666;
+      margin-bottom: 0.3rem;
+    }
+    
+    .footer-message {
+      font-size: 9px;
+      color: #888;
+      font-style: italic;
+    }
+    
+    /* Print optimizations */
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        background: white !important;
+        padding: 0;
+        display: block;
+      }
+      
+      .quote-container {
+        width: auto;
+        min-height: auto;
+        box-shadow: none;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+      }
+      
+      .quote-header { padding: 0.75rem; margin-bottom: 0.75rem; }
+      .quote-body { gap: 0.75rem; margin-bottom: 0.75rem; }
+      .quote-section { padding: 0.6rem; }
+      .data-row { padding: 0.25rem 0; }
+      .pricing-summary { margin-top: 0.75rem; }
+      .pricing-header { padding: 0.4rem 0.8rem; }
+      .pricing-column { padding: 0.6rem; }
+      .quote-footer { margin-top: 0.75rem; padding: 0.6rem; }
+
+      .quote-section,
+      .pricing-summary { page-break-inside: avoid; }
+    }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>DTF Quote: ${quoteData.quote_name}</h1>
-        <p>Customer: ${quoteData.customer_email}</p>
-        <p>Date: ${new Date(quoteData.date_created).toLocaleDateString()}</p>
-    </div>
+  <div class="quote-container">
     
-    <div class="quote-details">
-        <h2>Quote Details</h2>
-        <p>Total Transfers: ${quoteData.total_transfers || 'N/A'}</p>
-        
-        ${Object.entries(data).map(([key, value]) => 
-          `<p><strong>${key.replace(/_/g, ' ').toUpperCase()}:</strong> ${value}</p>`
-        ).join('')}
+    <!-- Modern Header -->
+    <header class="quote-header">
+      <div class="header-top">
+        <div class="company-branding">
+          <div class="company-name">DTF Rush Orders</div>
+          <div class="company-tagline">Premium DTF Transfer Solutions</div>
+        </div>
+        <div class="quote-title">${quoteData.quote_name}</div>
+      </div>
+      <div class="header-bottom">
+        <div class="contact-info">
+          <span>📞 (954) 404-8103</span>
+          <span>✉️ orders@dtfrushorders.com</span>
+        </div>
+        <div class="quote-meta">
+          <span>${data.date_stamp || new Date().toLocaleDateString()}</span>
+          <span>${data.loc_count || locations.length} Locations</span>
+          <span>${data.total_transfers || quoteData.total_transfers} Transfers</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content Body -->
+    <div class="quote-body">
+      
+      <!-- Design Locations -->
+      <section class="quote-section locations-section">
+        <h3 class="section-title">📍 Design Locations</h3>
+        <div class="locations-grid">
+          ${locationHtml}
+        </div>
+      </section>
+      
+      <!-- Production Costs -->
+      <section class="quote-section">
+        <h3 class="section-title">🏭 Production Costs</h3>
+        <div class="data-row">
+          <span class="data-label">Imprint Cost</span>
+          <span class="data-value">${data.imprint_cost || '$0.00'}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Product Cost</span>
+          <span class="data-value">${data.product_cost_total || '$0.00'}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Press Cost</span>
+          <span class="data-value">${data.press_cost_total || '$0.00'}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Per Unit</span>
+          <span class="data-value highlight-value">${data.unit_cost || '$0.00'}</span>
+        </div>
+      </section>
+
+      <!-- Transfer Details -->
+      <section class="quote-section">
+        <h3 class="section-title">📦 Transfer Details</h3>
+        <div class="data-row">
+          <span class="data-label">Total Transfers</span>
+          <span class="data-value">${data.total_transfers || quoteData.total_transfers || '0'}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Cost per Transfer</span>
+          <span class="data-value">${data.cost_per_transfer || '$0.00'}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Sheet Length</span>
+          <span class="data-value">${data.sheet_length || '0.00"'}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Sheet Quantity</span>
+          <span class="data-value">${data.sheet_qty || '0'}</span>
+        </div>
+      </section>
+
+      <!-- Gang Sheet Info -->
+      <section class="quote-section">
+        <h3 class="section-title">📏 Gang Sheet Breakdown</h3>
+        <div class="data-row" style="border-top: 1px solid #CF0F0F; padding-top: 0.5rem; margin-top: 0.5rem;">
+          <span class="data-label">Total Sheet Cost</span>
+          <span class="data-value highlight-value">${data.sheet_cost || '$0.00'}</span>
+        </div>
+      </section>
+
+      <!-- Markup & Pricing -->
+      <section class="quote-section">
+        <h3 class="section-title">💰 Pricing & Markup</h3>
+        <div class="data-row">
+          <span class="data-label">Markup Percentage</span>
+          <span class="data-value">${data.markup || '0'}%</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Retail Per Unit</span>
+          <span class="data-value">${data.retail_unit || quoteData.pricing?.retail_unit || '$0.00'}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Total Sale Price</span>
+          <span class="data-value highlight-value">${data.retail_total || quoteData.pricing?.retail_total || '$0.00'}</span>
+        </div>
+        <div class="data-row" style="border-top: 2px solid #28a745; padding-top: 0.5rem; margin-top: 0.5rem;">
+          <span class="data-label" style="color: #28a745; font-weight: 700;">Total Profit</span>
+          <span class="data-value" style="color: #28a745; font-size: 14px;">${data.profit_total || quoteData.pricing?.profit_total || '$0.00'}</span>
+        </div>
+      </section>
+      
     </div>
-    
-    <div class="pricing">
-        <h2>Pricing</h2>
-        ${quoteData.pricing ? Object.entries(quoteData.pricing).map(([key, value]) => 
-          `<p><strong>${key.replace(/_/g, ' ').toUpperCase()}:</strong> $${value}</p>`
-        ).join('') : '<p>Pricing information not available</p>'}
+
+    <!-- Pricing Summary -->
+    <div class="pricing-summary">
+      <div class="pricing-header">💵 Quote Summary</div>
+      <div class="pricing-body">
+        <div class="pricing-column">
+          <div class="pricing-label">Per Unit Price</div>
+          <div class="pricing-value">${data.retail_unit || quoteData.pricing?.retail_unit || '$0.00'}</div>
+        </div>
+        <div class="pricing-column">
+          <div class="pricing-label">Quantity</div>
+          <div class="pricing-value">${data.total_transfers || quoteData.total_transfers || '0'}</div>
+        </div>
+        <div class="pricing-column">
+          <div class="pricing-label">Total</div>
+          <div class="pricing-value">${data.retail_total || quoteData.pricing?.retail_total || '$0.00'}</div>
+        </div>
+      </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="quote-footer">
+      <div class="footer-brand">DTF Rush Orders - Premium DTF Transfer Solutions</div>
+      <div class="footer-contact">📞 (954) 404-8103 • ✉️ orders@dtfrushorders.com</div>
+      <div class="footer-message">Thank you for using our DTF Reseller Tool by DTF Rush Orders! Generated on ${data.date_stamp || new Date().toLocaleDateString()}</div>
+    </footer>
+
+  </div>
 </body>
 </html>`;
 
